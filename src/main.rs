@@ -16,7 +16,7 @@ struct Ring {
 fn main() {
     let (mut rl, thread) = raylib::init()
         .size(900, 520)
-        .title("Sistema Solar - Sol centrado con Saturno y anillos")
+        .title("Sistema Solar")
         .build();
 
     rl.set_target_fps(60);
