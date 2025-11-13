@@ -6,40 +6,49 @@ use raylib::prelude::*;
 use geom::{vec3, Vec3};
 use body::{BodyShader, CelestialBody};
 
+struct Ring {
+    center: Vec3,
+    normal: Vec3,
+    inner_radius: f32,
+    outer_radius: f32,
+}
+
 fn main() {
     let (mut rl, thread) = raylib::init()
-        .size(640, 360)
-        .title("Sistema Solar - Sol centrado")
+        .size(900, 520)
+        .title("Sistema Solar - Sol centrado con Saturno y anillos")
         .build();
 
     rl.set_target_fps(60);
 
-    // Sol en el centro (agrandado 15%)
     let mut sun = CelestialBody::new(
         vec3(0.0, 0.0, 6.0),
         1.61,
         BodyShader::Sun,
     );
 
-    // Mercurio cerca pero fuera del sol
     let mut mercury = CelestialBody::new(
         vec3(2.2, 0.0, 6.0),
         0.4,
         BodyShader::Mercury,
     );
 
-    // Tierra más lejos
     let mut earth = CelestialBody::new(
         vec3(3.2, 0.0, 6.0),
         0.7,
         BodyShader::Earth,
     );
 
-    // Marte todavía más lejos
     let mut mars = CelestialBody::new(
         vec3(4.4, 0.0, 6.0),
         0.5,
         BodyShader::Mars,
+    );
+
+    let mut saturn = CelestialBody::new(
+        vec3(6.0, 0.0, 6.0),
+        0.9,
+        BodyShader::Saturn,
     );
 
     let sun_pos = sun.center;
@@ -47,14 +56,24 @@ fn main() {
     let mercury_orbit_radius = (mercury.center - sun_pos).norm();
     let earth_orbit_radius   = (earth.center   - sun_pos).norm();
     let mars_orbit_radius    = (mars.center    - sun_pos).norm();
+    let saturn_orbit_radius  = (saturn.center  - sun_pos).norm();
 
     let mercury_base_y = mercury.center.y;
     let earth_base_y   = earth.center.y;
     let mars_base_y    = mars.center.y;
+    let saturn_base_y  = saturn.center.y;
 
     let mercury_orbit_speed = 0.9;
     let earth_orbit_speed   = 0.4;
     let mars_orbit_speed    = 0.25;
+    let saturn_orbit_speed  = 0.18;
+
+    let mut saturn_rings = Ring {
+        center: saturn.center,
+        normal: vec3(0.0, 1.0, 0.3).normalize(),
+        inner_radius: saturn.radius * 1.8,
+        outer_radius: saturn.radius * 3.0,
+    };
 
     while !rl.window_should_close() {
         let time = rl.get_time() as f32;
@@ -82,7 +101,16 @@ fn main() {
             sun_pos.z + mars_orbit_radius * mars_angle.sin(),
         );
 
-        let bodies: [&CelestialBody; 4] = [&sun, &mercury, &earth, &mars];
+        let saturn_angle = time * saturn_orbit_speed;
+        saturn.center = vec3(
+            sun_pos.x + saturn_orbit_radius * saturn_angle.cos(),
+            saturn_base_y,
+            sun_pos.z + saturn_orbit_radius * saturn_angle.sin(),
+        );
+
+        saturn_rings.center = saturn.center;
+
+        let bodies: [&CelestialBody; 5] = [&sun, &mercury, &earth, &mars, &saturn];
 
         let mut d = rl.begin_drawing(&thread);
         d.clear_background(Color::BLACK);
@@ -129,6 +157,27 @@ fn main() {
                     }
                 }
 
+                if let Some((t_ring, normal_ring)) =
+                    intersect_ring(camera_pos, ray_dir, &saturn_rings)
+                {
+                    if t_ring < closest_t {
+                        closest_t = t_ring;
+                        let hit_pos = camera_pos + ray_dir * t_ring;
+
+                        let light_dir = (sun_pos - hit_pos).normalize();
+                        let c = shaders::shade_saturn_rings(
+                            hit_pos,
+                            normal_ring,
+                            light_dir,
+                            time,
+                            saturn_rings.center,
+                            saturn_rings.inner_radius,
+                            saturn_rings.outer_radius,
+                        );
+                        pixel_color = c;
+                    }
+                }
+
                 d.draw_pixel(x, y, pixel_color);
             }
         }
@@ -165,6 +214,40 @@ fn intersect_sphere(
 
     let hit = ray_origin + ray_dir * t;
     let normal = (hit - center).normalize();
+
+    Some((t, normal))
+}
+
+fn intersect_ring(
+    ray_origin: Vec3,
+    ray_dir: Vec3,
+    ring: &Ring,
+) -> Option<(f32, Vec3)> {
+    let n = ring.normal.normalize();
+    let denom = n.dot(&ray_dir);
+    if denom.abs() < 1e-4 {
+        return None;
+    }
+
+    let t = n.dot(&(ring.center - ray_origin)) / denom;
+    if t <= 0.0 {
+        return None;
+    }
+
+    let hit_pos = ray_origin + ray_dir * t;
+
+    let v = hit_pos - ring.center;
+    let v_proj = v - n * v.dot(&n);
+    let r = v_proj.norm();
+
+    if r < ring.inner_radius || r > ring.outer_radius {
+        return None;
+    }
+
+    let mut normal = n;
+    if normal.dot(&ray_dir) > 0.0 {
+        normal = -normal;
+    }
 
     Some((t, normal))
 }

@@ -6,6 +6,7 @@ pub enum BodyShader {
     Earth,
     Mars,
     Mercury,
+    Saturn, // gigante gaseoso
 }
 
 pub struct CelestialBody {
