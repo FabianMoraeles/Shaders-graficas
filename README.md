@@ -6,6 +6,8 @@ Todo el color de los planetas y anillos se genera mediante funciones matemática
 
 ---
 
+![Sistema planetario](SS.png)
+
 ## Cuerpos celestes implementados
 
 El sistema incluye:
@@ -84,3 +86,4 @@ Archivos principales:
 
 
 3. cargo run --release   
+
